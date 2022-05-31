@@ -1,72 +1,119 @@
-import React from 'react';
+import React, {useState, useEffect} from 'react'
 import axios from 'axios';
-
-import { MovieCard } from '../movie-card/movie-card';
+import { BrowserRouter as Router} from "react-router-dom";
+import { MainView } from '../main-view/main-view';
 import { MovieView } from '../movie-view/movie-view';
+import { MovieCard } from '../movie-card/movie-card';
+// import { FavouritesView } from '../favourite-view/favourite-view';
+import { DirectorView } from '../director-view/director-view';
+import { GenreView } from '../genre-view/genre-view';
+import { ProfileView } from '../profile-view/profile-view';
 import { LoginView } from '../login-view/login-view';
-import { Row, Col } from 'react-bootstrap/';
+import { RegisterView } from '../register-view/register-view';
+import { NavbarView } from '../navbar-view/navbar-view';
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route
+} from "react-router-dom";
+import { Row, Col, Spinner } from 'react-bootstrap/';
 
-export class MainView extends React.Component {
+export function MainView(props) {
 
-    constructor(){
-        super();
-        this.state = {
-          movies: [],
-          selectedMovie: null,
-          user: null,
-          isRegistered: false
+    const [movies, setMovies] = useState([]);
+    const [user, setUser] = useState(props.user);
+    const [loading, setLoading] = useState(true);
+		const [error, setError] = useState();
+
+    useEffect(() => {
+      let accessToken = localStorage.getItem('token');
+      if (accessToken !== null) {
+          setUser(localStorage.getItem('user'));
         }
-      }
+      getMovies(accessToken);
+      },[user])
 
-      //Logic to be executed after loading page
-      componentDidMount(){
-        axios.get('https://my-flix-cf.herokuapp.com/movies')
-          .then(response => {
-            this.setState({
-              movies: response.data
-            });
-          })
-          .catch(error => {
-            console.log(error);
-          });
+       /* When a user successfully logs in, this function updates the `user` property in state to that *particular user*/
+       function onLoggedIn(authData) {
+        console.log("OnLoggedIn...");
+        setUser(authData.user.Username)
+        localStorage.setItem('token', authData.token);
+        localStorage.setItem('user', authData.user.Username);
+        setLoading(false)
+
       }
  
-      setSelectedMovie(newSelectedMovie){
-          this.setState({
-               selectedMovie: newSelectedMovie
-            });
+    //fetch movies from API
+    async function getMovies(token) {
+         const response =  await axios.get('https://my-flix-cf.herokuapp.com/movies', {
+         headers: { Authorization: `Bearer ${token}`}
+        })
+        setMovies(response.data)
+        setLoading(false);
       }
 
-      /* When a user successfully logs in, this function updates the `user` property in state to that *particular user*/
-      onLoggedIn(user) {
-        this.setState({
-          user
-        });
-      }
+   //If data is not fetched, show spinner
+		if ((user) && (loading)) {
+			return <Row className="justify-content-center my-5">
+						<div className="h3 text-muted text-center">Loading Movies...
+							&nbsp;<Spinner animation="border" variant="secondary" role="status" />
+						</div>
+					</Row>		
+		 }
 
-      render() {
-        const { movies, selectedMovie, user } = this.state;
+		if (error) {
+			return <Row className="justify-content-center my-5">
+				<p>There was an error loading your data!</p>
+				</Row>
+		}
 
-        /* If there is no user, the LoginView is rendered. If there is a user logged in, the user details are *passed as a prop to the LoginView*/
-        if (!user) return <LoginView onLoggedIn={user => this.onLoggedIn(user)} />;
-     
-        if (movies.length === 0) return <div className="main-view" />;
-      
-        return (
-          <Row className="main-view justify-content-md-evenly m-0 p-5 align-items-center">
-            {selectedMovie
-              ? (
-                // <Col md={12}>
-                  <MovieView movie={selectedMovie} onBackClick={newSelectedMovie => { this.setSelectedMovie(newSelectedMovie); }} />
-                // </Col>
-              )
-              : movies.map(movie => (
-                <Col md={3}>
-                    <MovieCard key={movie._id} movie={movie} onMovieClick={newSelectedMovie => { this.setSelectedMovie(newSelectedMovie); }}/>
-                </Col>
-              ))
-            }
-          </Row>
-        );
-      }
-    }
+    return (
+    <>
+        <>
+            <Router>
+                <NavbarView />
+                <Routes>
+                <Route
+                    path="/"
+                    element={<>
+                      {(!user) ? <><Col><LoginView onLoggedIn={(user) => onLoggedIn(user)} /></Col></> :
+                      <><Row className="main-view justify-content-md-evenly m-0 p-5 align-items-start">{movies.map((m) => (<Col md={3} key={m._id}><MovieCard md={8} key={m._id} movieData={m} /></Col>))}</Row></>}
+                    </>}/>
+                        <Route path="/movies/:movie_id" element={<MovieView />} /> 
+
+                        {/* <Route path="/register" element={
+                                (user) ? <Redirect to="/" /> : <RegisterView />
+                              } /> */}
+
+                        <Route path="directors/:director_id" element={
+                                (!user) ? <Col><LoginView onLoggedIn={user => onLoggedIn(user)} /></Col>
+                                : <DirectorView />
+                              }/>
+
+                        <Route path="genres/:genre_id" element={
+                              (!user) ? <Col><LoginView onLoggedIn={user => onLoggedIn(user)} /></Col>
+                              : <GenreView />
+                              } />
+
+                        {/* <Route path="favourites" element={
+                              (!user) ? <Col><LoginView onLoggedIn={user => onLoggedIn(user)} /></Col>
+                              : <FavouritesView />
+                              } /> */}
+
+                        <Route path='profile' element={
+                              (!user) ? <LoginView onLoggedIn={user => onLoggedIn(user)} />
+                              : <ProfileView />
+                               } />
+
+                        <Route path='register' element={<RegisterView />} />
+
+                                {/*<Route path="profile" element={<ProfileView user={user} />} />
+                        <Route path="favourites" element={<FavouritesView user={user} />} />
+                        <Route path="directors/:director_id" element={<DirectorView user={user}/>} />
+                        <Route path="genres/:genre_id" element={<GenreView user={user}/>} />  */}
+                </Routes>
+            </Router>
+            </> 
+    </>  
+  )
+}
