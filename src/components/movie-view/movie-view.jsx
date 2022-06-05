@@ -1,162 +1,149 @@
-import React, {useState, useEffect} from 'react';
-import axios from 'axios';
+import React from 'react';
 import PropTypes from 'prop-types';
-import {Card, ListGroup, ListGroupItem, Button, Row, Col, Image, Stack, Spinner} from 'react-bootstrap';
-import {
-	Link,
-	useParams,
-	useNavigate,
-	useLocation
-} from "react-router-dom";
-import CardGroup from 'react-bootstrap/CardGroup';
-import '../movie-view/movie-view.css'
+import './movie-view.scss';
+import { Card, Col, Container, Row, Button } from 'react-bootstrap';
+import { Link } from "react-router-dom";
+import axios from 'axios';
+// /users/:Username/movies/:MovieID
 
-export function MovieView(props) {
-		
-		const baseURL = 'https://my-flix-cf.herokuapp.com/';
-				
-		//Destructuring the params Object
-		const navigate = useNavigate();
-		const {movie_id} = useParams();
-		const accessToken = localStorage.getItem('token');
-		const activeUser = localStorage.getItem('user');
+export class MovieView extends React.Component {
 
-		//Initializing movie and user obj
-		const [user, setUser] = useState('');
-		const [movie, setMovie] = useState('');	
+  constructor(props) {
+    super(props);
+    this.state = {
+      username: null,
+      password: null,
+      email: null,
+      birthday: null,
+      FavouriteMovies: [],
+    };
+  }
 
-		const [director, setDirector ] = useState('');
-		const [genres, setGenres] = useState([]);
-		const [isFavourite, setIsFavourite] = useState(false);
+  getUser(token) {
+    let user = localStorage.getItem("user");
+    axios
+      .get(`https://amro-mansour-movie-api.herokuapp.com/users/${user}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      .then((response) => {
+        //assign the result to the state
+        this.setState({
+          username: response.data.username,
+          password: response.data.password,
+          email: response.data.email,
+          birthday: response.data.birthday,
+          FavouriteMovies: response.data.FavouriteMovies,
+        });
+      })
+      .catch((e) => console.log(e));
+  }
+  componentDidMount() {
+    const accessToken = localStorage.getItem("token");
+    this.getUser(accessToken);
+  }
 
-		//Setting loading and error variables 
-		const [loading, setLoading] = useState(true);
-		const [error, setError] = useState();
+  // Add Favourite movie 
+  addFavMovie = () => {
+    let token = localStorage.getItem('token');
+    let user = localStorage.getItem("user");
+    let userFavMovies = this.state.FavouriteMovies;
+    let isFav = userFavMovies.includes(this.props.movie._id);
+    if (!isFav) {
+      axios.post(`https://amro-mansour-movie-api.herokuapp.com/users/${user}/movies/${this.props.movie._id}`, {},
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }).then((response) => {
+          console.log(response.data);
+          alert(
+            `${this.props.movie.Title} has been added to your list of movies`
+          );
+          window.open(`/movies/${this.props.movie._id}`, "_self");
+        })
+        .catch(e => {
+          console.log('Error')
+        });
+    } else if (isFav) {
+      alert(
+        `${this.props.movie.Title} is already present in your list of movies`
+      );
+    }
+  }
 
-		useEffect(() => {
-			getMissingData(activeUser)
-		},[])		
+  // Delete a movie from Favourite movies 
+  removeFavMovie = () => {
+    let token = localStorage.getItem('token');
+    let user = localStorage.getItem("user");
+    axios.delete(`https://amro-mansour-movie-api.herokuapp.com/users/${user}/movies/${this.props.movie._id}`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }).then((response) => {
+        console.log(response.data);
+        alert(
+          `${this.props.movie.Title} has been removed from your list of movies`
+        );
+        window.open(`/movies/${this.props.movie._id}`, "_self");
+      })
+      .catch(e => {
+        console.log('Error')
+      });
+  }
 
-		async function getMissingData(activeUser) {
-			axios.all([
-						axios(baseURL + 'users/' + activeUser,{ headers: { Authorization: `Bearer ${accessToken}`} } ),
-						axios(baseURL + 'movies/' + movie_id,{ headers: { Authorization: `Bearer ${accessToken}`} } ),
-						axios(baseURL + 'directors/',{ headers: { Authorization: `Bearer ${accessToken}`} } ),
-						axios(baseURL + 'genres/', { headers: { Authorization: `Bearer ${accessToken}`} } )
-						])
-							.then(axios.spread((userData, movieData, directorsData, genresData) => {
-								setUser(userData.data)
-								setMovie(movieData.data)
-								let movieDirector = {
-									Name: directorsData.data.find(dir => dir._id === movieData.data.Director).Name,
-									_id: directorsData.data.find(dir => dir._id === movieData.data.Director)._id
-								};
-								let movieGenres = [];
-								movieData.data.Genre.forEach((g, i) => {
-									movieGenres.push(genresData.data.find(gen => gen._id === g));
-								})
-								//If already favourite show only remove link
-								if (userData.data.FavoriteMovies.includes(movie_id)) setIsFavourite(true)
+  render() {
+    const { movie, onBackClick } = this.props;
+    const { FavouriteMovies, username, password, email, birthday } = this.state;
+    let userFavMovies = this.state.FavouriteMovies;
+    let isFav = userFavMovies.includes(this.props.movie._id);
 
-								setDirector(movieDirector)
-								setGenres(movieGenres)
-							}))
-							.catch(error => console.error(error))
-							.finally(() => {
-								setLoading(false)
-							})												
-		}
+    return (
 
-		const isFeatured = (val) => {
-			if (movie != '') { 
-				if (val) 		return <strong>Available</strong>;
-				else			return 'Not Available';
-			}
-		}
+      <Container>
+        <Row>
+          <Col>
+            <Card className="movie-view__card" style={{ width: '40rem' }}>
+              <Card.Body>
+                <Card.Img className="movie-view__image" variant="top" src={movie.ImagePath} />
+                <Card.Title className="title-style">{movie.Title}</Card.Title>
 
-		const addFavouriteMovie = () => {
-			//The put method in Axios serialize the 2nd parameter as JSON string !!! IMPORTANT
-			axios.put(baseURL + 'users/' + activeUser + '/favs/'+ movie._id, {} , { headers: { Authorization: `Bearer ${accessToken}`} } )
-			.then(response => {
-							console.log(response.data);
-							setIsFavourite(true)
-							})
-						.catch(error => {
-							console.log(error);
-							setError(error);
-						})
-		}
+                <Card.Text className="text-style">Genre: {movie.Genre.Name}
+                  <Link to={`/genres/${movie.Genre.Name}`}>
+                    <Button variant="link">more info</Button>
+                  </Link>
+                </Card.Text>
 
-		const removeFavouriteMovie = (e) => {
-			let movieToRemove = ([e.target.id]);
-			axios.delete(baseURL+'users/'+ activeUser +'/favs/'+ movie_id, { headers: { Authorization: `Bearer ${accessToken}`} })
-				.then(response => {
-					console.log(response.data);
-						setIsFavourite(false)
-					})
-				.catch(error => {
-					console.log(error);
-					setError(error);
-				})
-		}
+                <Card.Text className="text-style">Director: {movie.Director.Name}
+                  <Link to={`/directors/${movie.Director.Name}`}>
+                    <Button variant="link">more info</Button>
+                  </Link>
+                </Card.Text>
 
-		//While data is not fetched, show spinner
-		if (loading) {
-			return <Row className="justify-content-center my-5">
-						<div className="h3 text-muted text-center">Data is loading
-							&nbsp;<Spinner animation="border" variant="secondary" role="status" />
-						</div>
-					</Row>		
-		 }
+                <Card.Text className="text-style">{movie.Description}</Card.Text>
+                <Button variant="outline-warning" onClick={() => { onBackClick() }}>Back</Button>
 
-		if (error) {
-			return <Row className="justify-content-center my-5">
-				<p>There was an error loading your data!</p>
-				</Row>
-		}
-
-		return (
-		<>
-		
-		<Row className="justify-content-center my-5">
-				<Col md={6}> 
-						<div className="h3 text-muted text-center">{movie.Title}</div>
-							
-							<div className="p-1 m-1 h6 text-muted text-center">
-									<p>({ 
-										genres.map((g, i) => (i!=0) ? <>, <Link className="std-link" key={g._id} to={`/genres/${g._id}`}>{g.Name}</Link></> : <Link className="std-link" key={g._id} to={`/genres/${g._id}`}>{g.Name}</Link>)
-										})</p>
-							</div>
-
-							<div className="p-4 m-3 h5 text-muted text-center">
-								<p>Directed by <Link className="std-link" to={`../directors/${director._id}`}>{(director) && director.Name}</Link></p>
-								&nbsp;
-								<p>{movie.Description}</p>
-							</div>    
-
-						 <Stack gap={2} className="d-flex justify-content-center align-items-center">
-										<div>Actors</div><div className="bg-light border p-2 m-3 px-3">
-											{ movie.Actors.map((actor, i) => (i!=0) ? ', '+actor : actor)}
-										</div>
-						</Stack> 
-						<Stack gap={2} className="d-flex justify-content-center align-items-center">
-						<div>Available in Theathers</div><div className="bg-light border p-2 m-3 px-3">{isFeatured(movie.Featured)}</div>
-						</Stack>
-						<Stack gap={3} className="col-md-5 text-center mx-auto">
-										<>{(!isFavourite) && <Button variant="link text-muted" onClick={addFavouriteMovie}>Add to favourites</Button>}</>
-										<>{(isFavourite) && <Button variant="link text-muted" onClick={removeFavouriteMovie}>Remove from Favourites</Button>}</>
-						</Stack>
-						<Stack gap={2} className="col-md-5 mx-auto text-center m-4 p-2">
-										<Button variant="secondary" onClick={() => { navigate('/') }}>Back to all movies</Button>     
-						</Stack>
-				</Col>
-
-		<Col md={5}> 
-					<Image className="poster" src={movie.ImagePath} crossOrigin="anonymous"/>
-				</Col>
-		</Row>
-		
-		</>
-		)
-
+                {!isFav && (
+                  <Button className="add-list__button" variant="warning" onClick={this.addFavMovie}>Add to your list</Button>
+                )}
+                {isFav && (
+                  <Button className="add-list__button" variant="warning" onClick={this.removeFavMovie}>Remove from your list</Button>
+                )}
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
+      </Container>
+    );
+  }
 }
+
+MovieView.propTypes = {
+  movie: PropTypes.shape({
+    Title: PropTypes.string.isRequired,
+    Description: PropTypes.string.isRequired,
+    ImagePath: PropTypes.string.isRequired,
+    Genre: PropTypes.shape({
+      Name: PropTypes.string.isRequired
+    })
+  }).isRequired,
+  onBackClick: PropTypes.func.isRequired
+};

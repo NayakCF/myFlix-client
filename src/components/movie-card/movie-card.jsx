@@ -1,28 +1,31 @@
-import React, {useState, useEffect} from 'react';
+import React from 'react';
 import PropTypes from 'prop-types';
-import {Card } from 'react-bootstrap';
+import Button from 'react-bootstrap/Button';
+import Card from 'react-bootstrap/Card';
+import './movie-card.scss';
+
 import { Link } from "react-router-dom";
 
-import '../movie-card/movie-card.css'
-
-export function MovieCard(props) {
- 
-  const [movie, setMovie ] = useState(props.movieData);
-  const [user, setUser ] = useState('');
- 
-    useEffect(() =>{
-    },[])
+export class MovieCard extends React.Component {
+  render() {
+    const { movie } = this.props;
 
     return (
-        <Card>
-        {/* crossorigin="anonymous" is important to bypass CORP security protection */}
+      <Card className="card-style" style={{ width: '18rem' }}>
+        <Card.Img variant="top" className="image-style" src={movie.ImagePath} />
+        <Card.Body>
+          <Card.Title className="title-style">{movie.Title}</Card.Title>
           <Link to={`/movies/${movie._id}`}>
-              <Card.Img variant="top" src={movie.ImagePath} crossOrigin="anonymous"/>
+            <Button className="button-style" variant="warning">Open</Button>
           </Link>
-          <Card.Body>
-          <Card.Title as="h5" className="description">{movie.Title}</Card.Title>
-          <Card.Text>{movie.Description}</Card.Text>
-          </Card.Body>
-        </Card>
-       )
-    }
+        </Card.Body>
+      </Card>
+    );
+  }
+}
+
+MovieCard.propTypes = {
+  movie: PropTypes.shape({
+    Title: PropTypes.string.isRequired
+  }).isRequired
+};

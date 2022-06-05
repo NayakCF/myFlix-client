@@ -1,243 +1,177 @@
-import React, { useState, useEffect } from "react";
-import { Row, Spinner, Col, Form, Button, ListGroup } from "react-bootstrap";
-import axios from "axios";
-// import { Card } from 'react-bootstrap';
-// import { Link } from "react-router-dom";
+import React, { useEffect, useState } from 'react';
+import './profile-view.scss'
+import PropTypes from 'prop-types';
+import { Form, Button, Card, CardGroup, Container, Col, Row, Modal } from 'react-bootstrap';
+import axios from 'axios';
+import { Link } from 'react-router-dom';
+import { MovieCard } from '../movie-card/movie-card';
 
-import { UpdateView } from "./update-view";
-import { UserView } from "./user-view";
-import { FavouritesView } from "./favourite-view";
 
-export function ProfileView(props) {
-  const baseURL = "https://my-flix-cf.herokuapp.com/";
-  const accessToken = localStorage.getItem("token");
-  const activeUser = localStorage.getItem("user");
-
-  const [user, setUser] = useState(props.user);
-  const [isUpdate, setIsUpdate] = useState(false);
-
-  const [movies, setMovies] = useState(props.movies);
-
-  //Setting loading and error variables
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState();
+export function ProfileView({ movies }) {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('');
+  const [birthday, setBirthday] = useState('');
+  const [favouriteMovies, setFavouriteMovies] = useState([]);
+  const [show, setShow] = useState(false); // setting the state for the deleteUser modal 
 
   useEffect(() => {
-    getMissingData();
-  }, []);
+    getUser()
+  }, [])
 
-  async function getMissingData() {
-    axios
-      .all([
-        axios(baseURL + "users/" + activeUser, {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        }),
-        axios(baseURL + "movies/", {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        }),
-      ])
-      .then(
-        axios.spread((userData, moviesData) => {
-          setUser(userData.data);
-          setMovies(moviesData.data);
-        })
-      )
-      .catch((error) => console.error(error))
-      .finally(() => {
-        setLoading(false);
+  const getUser = () => {
+    let token = localStorage.getItem('token');
+    let user = localStorage.getItem("user");
+    axios.get(`https://amro-mansour-movie-api.herokuapp.com/users/${user}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then((response) => {
+        setUsername(response.data.Username)
+        setEmail(response.data.Email)
+        setFavouriteMovies(response.data.FavouriteMovies)
+        console.log(response.data)
+      })
+      .catch(e => {
+        console.log('Error')
       });
   }
 
-  const parseDate = (date) => {
-    console.log(date);
-    let newDate = date.split("T");
-    return newDate[0];
-  };
-
-  const toggleUpdateShow = () => {
-    setIsUpdate((prevData) => {
-      return !prevData;
-    });
-  };
-
-  function handleDelete() {
-    console.log(baseURL + "users/" + user.Username);
-    axios
-      .delete(baseURL + "users/" + user.Username, {
-        headers: { Authorization: `Bearer ${accessToken}` },
+  // Update users info 
+  const updateUser = () => {
+    let token = localStorage.getItem('token');
+    let user = localStorage.getItem("user");
+    axios.put(`https://amro-mansour-movie-api.herokuapp.com/users/${user}`, {
+      Username: username,
+      Email: email, //Email is a variable which holds the email
+      Birthday: birthday,
+      Password: password
+    },
+      {
+        headers: {
+          Authorization: 'Bearer ' + token
+        }
+      }).then((response) => {
+        alert('Your profile has been updated');
+        localStorage.setItem('user', response.data.Username),
+          console.log(response.data)
       })
-      .then((response) => {
+      .catch(e => {
+        console.log('Error')
+      });
+  }
+
+  // Delete user 
+  const deleteUser = () => {
+    setShowModal(false)
+    let token = localStorage.getItem('token');
+    let user = localStorage.getItem("user");
+    axios.delete(`https://amro-mansour-movie-api.herokuapp.com/users/${user}`,
+      {
+        headers: {
+          Authorization: 'Bearer ' + token
+        }
+      }).then((response) => {
         console.log(response.data);
-        alert(
-          "Your account has been deleted. Thank you for using this API Service."
-        );
-        localStorage.clear();
+        alert('Your profile has been deleted');
+        localStorage.removeItem('user');
+        localStorage.removeItem('token');
         window.open("/", "_self");
       })
-      .catch((error) => {
-        console.log(error);
-        setError(error);
+      .catch(e => {
+        console.log('Error')
       });
   }
 
-  if (error) {
+  const renderFavourits = () => {
+    console.log(movies)
+    if (movies.length + 0) {
+
+      return (
+        <Row className="justify-content-md-center">
+
+          {favouriteMovies.length === 0 ? (<h5>Add some movies to your list</h5>) : (
+            favouriteMovies.map((movieId, i) => (
+              <Col md={6} lg={4}>
+                <MovieCard key={`${i}-${movieId}`} movie={movies.find(m => m._id == movieId)} />
+              </Col>
+            ))
+          )}
+
+        </Row>
+      )
+    }
+  }
+
+  // Functions needed to open and close the modal (below) to delete a user 
+  const handleClose = () => setShow(false);
+  const handleShow = () => setShow(true);
+
+  // Function that contains the modal to delete a users account 
+  const cancelUserModal = () => {
+
     return (
-      <Row className="justify-content-center my-5">
-        <p>There was an error loading your profile!</p>
-      </Row>
+      <>
+        <Modal style={{ background: "transparent" }} show={show} onHide={handleClose}>
+          <Modal.Header closeButton>
+            <Modal.Title>Delete your Account</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>Are you sure you want to delete your account?</Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" onClick={handleClose}>
+              Close
+            </Button>
+            <Button variant="primary" onClick={deleteUser}>
+              Delete
+            </Button>
+          </Modal.Footer>
+        </Modal>
+      </>
     );
   }
 
-  //If data is not fetched, show spinner
-  if (loading) {
-    return (
-      <Row className="justify-content-center my-5">
-        <div className="h3 text-muted text-center">
-          Loading Profile &nbsp;
-          <Spinner animation="border" variant="secondary" role="status" />
-        </div>
-      </Row>
-    );
-  }
 
   return (
     <>
-      <Row className="justify-content-between my-3">
-        <Col>
-          <div className="h4 text-muted text-center m-1 p-2">
-            {!isUpdate ? "My Profile" : "Update profile information"}
-          </div>
-        </Col>
-        <Col>
-          <div className="h3 text-muted text-center m-1 p-2">
-            <Button
-              className="h2 text-center m-1"
-              variant="secondary"
-              onClick={toggleUpdateShow}
-            >
-              {!isUpdate ? "Update profile" : "Show profile"}
-            </Button>
-            <Button
-              className="h2 text-center m-1"
-              variant="danger"
-              onClick={handleDelete}
-            >
-              Delete my account
-            </Button>
-          </div>
-        </Col>
-      </Row>
+      <Container>
+        <h1>Profile Page</h1>
+        <Form>
+          <Form.Group className="mb-3" controlId="username">
+            <Form.Label>Username:</Form.Label>
+            <Form.Control onChange={(e) => setUsername(e.target.value)} value={username} type="text" placeholder="username" />
+          </Form.Group>
+          <Form.Group className="mb-3" controlId="email">
+            <Form.Label>Email address</Form.Label>
+            <Form.Control onChange={(e) => setEmail(e.target.value)} value={email} type="email" placeholder="Enter new email" />
+          </Form.Group>
+          <Form.Group className="mb-3" controlId="birthday">
+            <Form.Label>Birthday:</Form.Label>
+            <Form.Control onChange={(e) => setBirthday(e.target.value)} value={birthday} type="date" placeholder="birthday" />
+          </Form.Group>
+          <Form.Group className="mb-3" controlId="password">
+            <Form.Label>Password</Form.Label>
+            <Form.Control onChange={(e) => setPassword(e.target.value)} type="password" value={password} placeholder="Password" />
+          </Form.Group>
 
-      <>
-        {" "}
-        {!isUpdate ? (
-          <Row className="justify-content-center">
-            <UserView user={user} />
-            <Col md={12}>
-              <FavouritesView user={user} movies={movies} />
-            </Col>
-          </Row>
-        ) : (
-          <UpdateView user={user} />
-        )}
-      </>
+          <Button variant="warning" onClick={updateUser}>
+            Update you profile
+          </Button>
+
+          {/* This button triggers a modal that's called bellow   */}
+          <Button className='deleteButton' variant="link" onClick={handleShow}>
+            Delete your profile
+          </Button>
+        </Form>
+
+        {/* Calling the function that renders the modal to delete the users account */}
+        {cancelUserModal()}
+
+        <p></p>
+        <h2>Favourite Movies:</h2>
+
+        {/* Calling the function that renders the users favourite movies on the profile page */}
+        {renderFavourits()}
+
+      </Container>
     </>
-  );
-}
-
-{
-  /* <Row className="justify-content-center my-3"><Col><div className="h6 text-muted text-center m-1 p-2">Favourite Movies</div></Col></Row>
-		<Row className="justify-content-center">
-			<Col>
-					
-				{/* <>
-					{<Row className="main-view justify-content-md-evenly m-0 p-2 align-items-start">
-						{(favouriteMovies.lenght > 0) 
-						? favouriteMovies.map(movie => (<Col md={3} key={movie._id}>{movieCardUnit(movie)}</Col>)) 
-						: <Col><div className="h6 text-muted text-center">You have not added yet a favourite movie</div></Col>}
-					</Row>}
-				</>
-			
-			<Row className="justify-content-center px-5">
-			<Col>
-									
-					<div className="d-flex justify-content-around align-items-center my-5">
-						<Button className="h2 text-center" variant="warning" onClick={handleUpdate}>Update my account</Button>
-						<Button className="h2 text-center" variant="danger" onClick={handleDelete}>Delete  my account</Button>
-					</div>
-					</Col>
-		
-			</Row>
-			</Col>
-		
-		</Row> */
-}
-
-{
-  /* <Row className="justify-content-center">
-				<Col md={5}> 
-					
-					
-					
-					<Form.Group className="mb-3 px-4" controlId="formPassword">	
-						<div className="d-flex justify-content-between align-items-center my-5">
-							<div className="h5 text-muted text-center">Username</div>
-							<div className="h5 text-muted text-center"><Form.Control 
-																			type="email" 
-																			name="Username"
-																			placeholder={user.Username}
-																			onChange={handleChange}
-																			/></div>
-						</div>
-					</Form.Group>
-				
-					
-				
-					<Form.Group className="mb-3 px-4" controlId="formEmail">		
-						<div className="d-flex justify-content-between align-items-center my-5">
-								<div className="h5 text-muted text-center"><Form.Label>Email address</Form.Label></div>
-								<div className="h5 text-muted text-center"><Form.Control 
-																				type="email" 
-																				name="Email"
-																				placeholder={user.Email} 
-																				onChange={handleChange}
-																				/></div>
-						</div>
-					</Form.Group>
-																				
-                </Col>
-				
-				<Col md={5}>
-				<Form.Group className="mb-3 px-4" controlId="formPassword">	
-						<div className="d-flex justify-content-between align-items-center my-5">
-							<div className="h5 text-muted text-center">Password</div>
-							<div className="h5 text-muted text-center d-flex">
-								{ (updateUser.Password != '') ? <Button 
-																			className="h2 text-center buttonReset" 
-																			variant="secondary"
-																			onClick={showPasswordInput}
-																			>
-																				Reset password
-																			</Button> : <Form.Control
-																			className="passwordInput" 
-																			type="password" 
-																			name="Password"
-																			placeholder='Type your new password'
-																			onChange={handleChange}
-																			/>	}										
-						</div>
-						</div>
-						<Form.Group className="mb-2 px-4" controlId="formBirthday">		
-						<div className="d-flex justify-content-between align-items-center my-5">
-								<div className="h5 text-muted text-center"><Form.Label>Birthday</Form.Label></div>
-								<div className="h5 text-muted text-center"><Form.Control 
-																				type="email"
-																				name="Birthday" 
-																				placeholder={(user.Birthday) ? parseDate(user.Birthday) : 'Date of birth'} 
-																				/></div>
-						</div>
-					</Form.Group>
-					</Form.Group>
-				</Col>
-        </Row> */
+  )
 }
