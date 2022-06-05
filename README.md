@@ -4,5 +4,6 @@ This the client-side of movie application. The app will allow users to register,
 
 #Technologies used
 
-- REACT
+- REACT Bootstrap
 - Sass
+- Parcel
